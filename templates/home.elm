@@ -22,13 +22,42 @@ type alias Model =
   , questions : List Question
   }
 
-type alias Question =
+type Question
+  = Voting VotingQuestion
+  | MC MultipleChoiceQuestion
+
+type alias VotingQuestion =
   { title : String
   , prompt : String
   , score : Int
-  , id : Int
+  , uuid : String
   , userStatus : Status
   }
+
+type alias MultipleChoiceQuestion =
+  { uuid : String
+  , title : String
+  , prompt : String
+  , answers : List MultipleChoiceOption
+  }
+
+type alias MultipleChoiceOption =
+  { option : String
+  , uuid : String
+  , selected : Bool
+  }
+
+mc_question : MultipleChoiceQuestion
+mc_question =
+  MultipleChoiceQuestion "0xyz" "What dinner?" "What want." options
+
+options : List MultipleChoiceOption
+options =
+  [ MultipleChoiceOption "Steak" "1234" False
+  , MultipleChoiceOption "Burger" "1235" False
+  , MultipleChoiceOption "Salmon" "1236" False
+  , MultipleChoiceOption "Chipotle" "1237" False
+  ]
 
 type Status
   = Upvoted
@@ -43,22 +72,22 @@ init =
 
 type Msg
   = Noop
-  | Upvote Question
-  | Downvote Question
+  | Upvote VotingQuestion
+  | Downvote VotingQuestion
 
-increaseScore : Question -> Question
+increaseScore : VotingQuestion -> VotingQuestion
 increaseScore question =
   { question | score = question.score + 1 }
 
-decreaseScore : Question -> Question
+decreaseScore : VotingQuestion -> VotingQuestion
 decreaseScore question =
   { question | score = question.score - 1 }
 
-setStatus : Status -> Question -> Question
+setStatus : Status -> VotingQuestion -> VotingQuestion
 setStatus newStatus question =
   { question | userStatus = newStatus }
 
-undoExistingVote : Question -> Question
+undoExistingVote : VotingQuestion -> VotingQuestion
 undoExistingVote question =
   case question.userStatus of
     Upvoted ->
@@ -73,7 +102,7 @@ undoExistingVote question =
       question
 
 
-updateQuestion : Status -> Question -> Question
+updateQuestion : Status -> VotingQuestion -> VotingQuestion
 updateQuestion newStatus question =
   case newStatus of
     Upvoted ->
@@ -90,16 +119,20 @@ updateQuestion newStatus question =
       question
         |> setStatus Neutral
 
-updateQuestions : List Question -> Int -> Status -> List Question
+updateQuestions : List Question -> String -> Status -> List Question
 updateQuestions questions id newStatus =
   case questions of
     [] ->
       []
     first :: rest ->
-      if first.id == id then
-        updateQuestion newStatus first :: updateQuestions rest id newStatus
-      else
-        first :: updateQuestions rest id newStatus
+      case first of
+        Voting votingQ ->
+          if votingQ.uuid == id then
+            (Voting <| updateQuestion newStatus votingQ) :: updateQuestions rest id newStatus
+          else
+            (Voting votingQ) :: updateQuestions rest id newStatus
+        MC mcQ ->
+          (MC mcQ) :: updateQuestions rest id newStatus
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -108,16 +141,16 @@ update msg model =
       model ! []
 
     Upvote question ->
-      { model | questions = (updateQuestions model.questions question.id Upvoted) }
+      { model | questions = (updateQuestions model.questions question.uuid Upvoted) }
         ! []
 
     Downvote question ->
-      { model | questions = (updateQuestions model.questions question.id) Downvoted}
+      { model | questions = (updateQuestions model.questions question.uuid) Downvoted}
         ! []
 
 -- VIEW
 
-upvoteButton : Question -> Html Msg
+upvoteButton : VotingQuestion -> Html Msg
 upvoteButton question =
   case question.userStatus of
     Upvoted ->
@@ -126,7 +159,7 @@ upvoteButton question =
     _ ->
       button [ onClick <| Upvote question, class "btn cyan lighten-3 waves-effect waves-light" ] [icon "arrow_drop_up"]
 
-downvoteButton : Question -> Html Msg
+downvoteButton : VotingQuestion -> Html Msg
 downvoteButton question =
   case question.userStatus of
     Downvoted ->
@@ -135,7 +168,7 @@ downvoteButton question =
     _ ->
       button [ onClick <| Downvote question, class "btn cyan lighten-3 waves-effect waves-light" ] [icon "arrow_drop_down"]
 
-card : Question -> Html Msg
+card : VotingQuestion -> Html Msg
 card question =
   div [ class "row" ]
     [ div [ class "col s10 offset-s1" ]
@@ -177,24 +210,54 @@ navbar =
 
 questions : List Question
 questions =
-  [ Question "Title of Q" "lorem ipsum dolor sit amet" 0 1 Neutral
-  , Question "Second Q" "lorem ipsum dolor sit amet" 0 2 Neutral
-  , Question "Second Q" "lorem ipsum dolor sit amet" 0 3 Neutral
-  , Question "Second Q" "lorem ipsum dolor sit amet" 0 2 Neutral
-  , Question "Second Q" "lorem ipsum dolor sit amet" 0 5 Neutral
+  [ Voting <| VotingQuestion "Title of Q" "lorem ipsum dolor sit amet" 0 "1" Neutral
+  , MC <| mc_question
+  , Voting <| VotingQuestion "Title of Q" "lorem ipsum dolor sit amet" 0 "2" Neutral
+  , MC <| mc_question
+  , Voting <| VotingQuestion "Title of Q" "lorem ipsum dolor sit amet" 0 "3" Neutral
   ]
+
+mcOption : MultipleChoiceOption -> Html Msg
+mcOption option =
+  p []
+    [ input [ name "group1", type_ "radio", id option.uuid ] []
+    , label [ class "white-text", for option.uuid ] [ text option.option ]
+    ]
+
+mcQuestion : MultipleChoiceQuestion -> Html Msg
+mcQuestion question =
+  div [ class "row" ]
+    [ div [ class "col s10 offset-s1" ]
+      [ div [ class "card-panel cyan lighten-1 row" ]
+        [ h4 [ class "white-text thin" ] [ text question.title ]
+        , span [ class "white-text" ] [ text question.prompt ]
+        , div [] (List.map mcOption question.answers)
+        ]
+      ]
+    ]
+
+questionView : Question -> Html Msg
+questionView question =
+  case question of
+    Voting votingQ ->
+      card votingQ
+
+    MC mcQ ->
+      mcQuestion mcQ
 
 view : Model -> Html Msg
 view model =
   div [ class "cyan lighten-5" ]
     [ navbar
     , createButton
+    , div [] (List.map questionView model.questions)
     {--
+    , mcQuestion mc_question
     , h2 [] [text <| toString model.score]
     , h2 [] [text model.name]
     , h2 [] [text "YAY!"]
-    --}
     , div [] (List.map card model.questions)
+    --}
     ]
 
 -- SUBSCRIPTIONS
