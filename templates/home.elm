@@ -1,5 +1,4 @@
--- Read more about this program in the official Elm guide:
--- https://guide.elm-lang.org/architecture/effects/http.html
+module TestModule exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -8,8 +7,8 @@ import Http
 import Json.Decode as Decode
 
 main =
-  Html.programWithFlags
-    { init = init
+  Html.program
+    { init = init ! []
     , view = view
     , update = update
     , subscriptions = subscriptions
@@ -17,22 +16,14 @@ main =
 
 -- MODEL
 
-type alias Flags =
-  { score : String
-  , name : String
-  }
-
 type alias Model =
   { score : Int
   , name : String
   }
 
-init : Flags -> (Model, Cmd Msg)
-init flags =
-  Model
-    (String.toInt flags.score |> Result.toMaybe |> Maybe.withDefault 0)
-    flags.name
-    ! []
+init : Model
+init =
+  Model {{ score }} "{{ name }}"
 
 -- UPDATE
 
@@ -52,9 +43,8 @@ view model =
   div []
     [ h2 [] [text <| toString model.score]
     , h2 [] [text model.name]
+    , h2 [] [text "YAY!"]
     ]
-
-
 
 -- SUBSCRIPTIONS
 

@@ -8,14 +8,12 @@
   <body>
     <div id="my-app"></div>
   
-    <script src="{% static static_file %}"></script>
+    <script>
+      {{ elm_js | safe }}
+    </script>
     <script>
       var node = document.getElementById('my-app');
-      var app = Elm.Main.embed(node, {
-        {% for key, value in elm_flags.items %}
-          {{ key }}: "{{ value }}",
-        {% endfor %}
-      });
+      var app = Elm.TestModule.embed(node);
     </script>
   </body>
 </html>
