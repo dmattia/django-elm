@@ -50,23 +50,56 @@ increaseScore : Question -> Question
 increaseScore question =
   { question | score = question.score + 1 }
 
+decreaseScore : Question -> Question
+decreaseScore question =
+  { question | score = question.score - 1 }
+
 setStatus : Status -> Question -> Question
 setStatus newStatus question =
   { question | userStatus = newStatus }
 
-upvoteQuestion : List Question -> Int -> List Question
-upvoteQuestion questions id=
+undoExistingVote : Question -> Question
+undoExistingVote question =
+  case question.userStatus of
+    Upvoted ->
+      question
+        |> decreaseScore
+        |> setStatus Neutral
+    Downvoted ->
+      question
+        |> increaseScore
+        |> setStatus Neutral
+    Neutral ->
+      question
+
+
+updateQuestion : Status -> Question -> Question
+updateQuestion newStatus question =
+  case newStatus of
+    Upvoted ->
+      question
+        |> undoExistingVote
+        |> increaseScore
+        |> setStatus Upvoted
+    Downvoted ->
+      question
+        |> undoExistingVote
+        |> decreaseScore
+        |> setStatus Downvoted
+    _ ->
+      question
+        |> setStatus Neutral
+
+updateQuestions : List Question -> Int -> Status -> List Question
+updateQuestions questions id newStatus =
   case questions of
     [] ->
       []
     first :: rest ->
       if first.id == id then
-        (first
-          |> increaseScore
-          |> setStatus Upvoted
-        ) :: upvoteQuestion rest id
+        updateQuestion newStatus first :: updateQuestions rest id newStatus
       else
-        first :: upvoteQuestion rest id
+        first :: updateQuestions rest id newStatus
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -75,11 +108,11 @@ update msg model =
       model ! []
 
     Upvote question ->
-      { model | questions = (upvoteQuestion model.questions question.id) }
+      { model | questions = (updateQuestions model.questions question.id Upvoted) }
         ! []
 
     Downvote question ->
-      { model | questions = (upvoteQuestion model.questions question.id) }
+      { model | questions = (updateQuestions model.questions question.id) Downvoted}
         ! []
 
 -- VIEW
@@ -93,6 +126,15 @@ upvoteButton question =
     _ ->
       button [ onClick <| Upvote question, class "btn cyan lighten-3 waves-effect waves-light" ] [icon "arrow_drop_up"]
 
+downvoteButton : Question -> Html Msg
+downvoteButton question =
+  case question.userStatus of
+    Downvoted ->
+      button [ onClick <| Downvote question, class "disabled btn cyan lighten-3 waves-effect waves-light" ] [icon "arrow_drop_down"]
+
+    _ ->
+      button [ onClick <| Downvote question, class "btn cyan lighten-3 waves-effect waves-light" ] [icon "arrow_drop_down"]
+
 card : Question -> Html Msg
 card question =
   div [ class "row" ]
@@ -105,7 +147,7 @@ card question =
         , div [ class "col s3 m2 white-text center" ]
           [ upvoteButton question
           , h4 [ class "thin" ] [ text <| toString question.score ]
-          , button [ onClick <| Downvote question, class "btn cyan lighten-3 waves-effect waves-light" ] [icon "arrow_drop_down"]
+          , downvoteButton question
           ]
         ]
       ]     
